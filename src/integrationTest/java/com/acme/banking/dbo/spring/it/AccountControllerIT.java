@@ -10,14 +10,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Collections;
 
-import static java.util.Arrays.asList;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,13 +44,27 @@ public class AccountControllerIT {
 
     @Test
     public void shouldGetTheOneAccountWhenRepoIsPrePopulated() throws Exception {
-        SavingAccount accountStub = new SavingAccount(100., "sa@sa.sa");
-        when(accounts.findAll()).thenReturn(asList(accountStub));
+        final SavingAccount accountStub = new SavingAccount(100., "sa@sa.sa");
+        when(accounts.findAll()).thenReturn(Collections.singletonList(accountStub));
 
         mockMvc.perform(get("/api/accounts").header("X-API-VERSION", "1"))
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(jsonPath("$.length()").value("1"))
-                    .andExpect(jsonPath("$[0].amount").value("100.0"))
-                    .andExpect(jsonPath("$[0].email").value("sa@sa.sa"));
+                .andExpect(jsonPath("$[0].amount").value("100.0"))
+                .andExpect(jsonPath("$[0].email").value("sa@sa.sa"));
+    }
+
+    @Test
+    public void shouldReturnStatusOkWhenDeleteExistingAccount() throws Exception {
+        mockMvc.perform(delete("/api/accounts/1").header("X-API-VERSION", "1"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    public void shouldReturnStatusNotFoundWhenDeleteNonexistentAccount() throws Exception {
+        doThrow(new EmptyResultDataAccessException(1)).when(accounts).deleteById(1L);
+
+        mockMvc.perform(delete("/api/accounts/1").header("X-API-VERSION", "1"))
+                .andExpect(status().isNotFound());
     }
 }
